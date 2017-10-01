@@ -6,7 +6,6 @@
       <module fileurl="file://$PROJECT_DIR$/androidthings-led.iml" filepath="$PROJECT_DIR$/androidthings-led.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
-      <module fileurl="file://$PROJECT_DIR$/libvlc/libvlc.iml" filepath="$PROJECT_DIR$/libvlc/libvlc.iml" />
     </modules>
   </component>
 </project>
