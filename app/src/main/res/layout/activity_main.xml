@@ -22,6 +22,42 @@
         android:id="@+id/imageView"
         android:layout_width="100dp"
         android:layout_height="100dp" />
+
+    <SurfaceView
+        android:id="@+id/surface"
+        android:layout_width="400dp"
+        android:layout_height="240dp"
+        android:layout_alignParentTop="true" />
+
+    <FrameLayout
+        android:id="@+id/position_anchor"
+        android:layout_width="2dp"
+        android:layout_height="40dp"
+        android:layout_below="@id/surface"
+        android:layout_centerHorizontal="true">
+    </FrameLayout>
+<LinearLayout
+    android:orientation="horizontal"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <Button
+        android:layout_width="100dp"
+        android:layout_height="40dp"
+        android:text="Play"
+        android:id="@+id/play_btn"
+        android:layout_alignBottom="@+id/position_anchor"
+        android:layout_toStartOf="@+id/position_anchor" />
+
+    <Button
+        android:layout_width="100dp"
+        android:layout_height="40dp"
+        android:text="Stop"
+        android:id="@+id/stop_btn"
+        android:layout_alignBottom="@+id/position_anchor"
+        android:layout_toEndOf="@+id/position_anchor" />
+
+
+</LinearLayout>
     <WebView
         android:id="@+id/webview"
         android:layout_width="match_parent"
