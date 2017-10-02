@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">BlinkLED</string>
-    <string name="error_player">There was an error initializing the YouTubePlayer (%1$s)</string>
+    <string name="str_start">Start</string>
+    <string name="str_stop">Stop</string>
 </resources>

@@ -1,38 +1,35 @@
 package kr.hs.emirim.progh2.blinkled;
 
 import android.content.Context;
-import android.content.res.Configuration;
-import android.graphics.SurfaceTexture;
-
-import android.media.MediaPlayer;
-import android.net.Uri;
-import android.os.Build;
-import android.os.Handler;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
+import android.os.Message;
+import android.speech.tts.TextToSpeech;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.view.Gravity;
-import android.view.SurfaceHolder;
-import android.view.SurfaceView;
-import android.view.TextureView;
 import android.view.View;
-import android.view.ViewGroup;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.ImageView;
-import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.things.pio.Gpio;
 import com.google.android.things.pio.PeripheralManagerService;
+import com.naver.speech.clientapi.SpeechRecognitionResult;
 import com.squareup.picasso.Picasso;
 import com.tsengvn.typekit.TypekitContextWrapper;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Random;
 
-public class MainActivity extends AppCompatActivity  implements   SurfaceHolder.Callback {
+public class MainActivity extends AppCompatActivity implements View.OnClickListener{
 
     private static final String TAG = "투비:MainAct";
     private static final int INTERVAL_BETWEEN_BLINKS_MS = 1000;
@@ -46,14 +43,19 @@ public class MainActivity extends AppCompatActivity  implements   SurfaceHolder.
     private Gpio mLed3;
 
     private int mState;
-    TextView mTextView;
+    private TextView mTextView;
 
-    SurfaceView surfaceView;
-    SurfaceHolder surfaceHolder;
-    MediaPlayer mediaPlayer;
-    Button playButton;
+    private Button mButtonTTS;
+    TextToSpeech mTTS;
+    private ArrayList<String> mDurisays = new ArrayList<>();
 
-
+    private static final String CLIENT_ID = "0oaUmKeJptvjzk6o9FPU"; // "내 애플리케이션"에서 Client ID를 확인해서 이곳에 적어주세요.
+    private RecognitionHandler handler;
+    private NaverRecognizer naverRecognizer;
+    private TextView txtResult;
+    private Button btnStart;
+    private String mResult;
+    private AudioWriterPCM writer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,6 +63,30 @@ public class MainActivity extends AppCompatActivity  implements   SurfaceHolder.
         setContentView(R.layout.activity_main);
 
         mTextView = (TextView) findViewById(R.id.state);
+        mButtonTTS = (Button) findViewById(R.id.tts);
+        mButtonTTS.setOnClickListener(this);
+        Log.e(TAG, "TTS 기능 세팅 시작");
+        mDurisays.add("구지원은 바보입니다");
+        mDurisays.add("선생님 안녕하세요");
+        mDurisays.add("저는 숙제중이에요");
+        mDurisays.add("저는 자고 싶어요");
+        mDurisays.add("환영합니다");
+
+        mTTS = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                Log.e(TAG, "TTS 기능 초기화 시도!");
+                if(status == TextToSpeech.SUCCESS){
+                    Log.e(TAG, "TTS 기능 초기화 성공! 한글 언어로 세팅");
+                    mTTS.setLanguage(Locale.KOREAN);
+                    mTTS.setPitch(0.8f);
+                    mTTS.setSpeechRate(1.2f);
+                }else{
+                    Log.e(TAG, "TTS 초기화 실패! : " +  status );
+                    mTTS = null;
+                }
+            }
+        });
 
 
         PeripheralManagerService service = new PeripheralManagerService();
@@ -101,33 +127,26 @@ public class MainActivity extends AppCompatActivity  implements   SurfaceHolder.
         // WebViewClient 지정
         w.setWebViewClient(new WebViewClientClass());
 
-        // surfaceView 등록
-        surfaceView = (SurfaceView) findViewById(R.id.surface);
-        surfaceHolder = surfaceView.getHolder();
-        // Activity로 Video Stream 전송 등록
-        surfaceHolder.addCallback(this);
-
-        playButton = (Button)findViewById(R.id.play_btn);
-        playButton.setOnClickListener(clickListener);
-
-        Button stopButton = (Button) findViewById(R.id.stop_btn);
-        stopButton.setOnClickListener(clickListener);
-
-
-    }
-
-    Button.OnClickListener clickListener = new View.OnClickListener() {
-
-        @Override
-        public void onClick(View v) {
-            if (v.getId() == R.id.play_btn) {
-                Log.i("main", "play");
-                startOrPause();
-            } else if (v.getId() == R.id.stop_btn) {
-                stopNprepare();
+        txtResult = (TextView) findViewById(R.id.txt_result);
+        btnStart = (Button) findViewById(R.id.btn_start);
+        handler = new RecognitionHandler(this);
+        naverRecognizer = new NaverRecognizer(this, handler, CLIENT_ID);
+        btnStart.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(!naverRecognizer.getSpeechRecognizer().isRunning()) {
+                    mResult = "";
+                    txtResult.setText("Connecting...");
+                    btnStart.setText(R.string.str_stop);
+                    naverRecognizer.recognize();
+                } else {
+                    Log.d(TAG, "stop and wait Final Result");
+                    btnStart.setEnabled(false);
+                    naverRecognizer.getSpeechRecognizer().stop();
+                }
             }
-        }
-    };
+        });
+    }
 
 
     @Override
@@ -160,9 +179,6 @@ public class MainActivity extends AppCompatActivity  implements   SurfaceHolder.
             }
         }
 
-        if (mediaPlayer != null) {
-            mediaPlayer.release();
-        }
 
     }
 
@@ -205,87 +221,20 @@ public class MainActivity extends AppCompatActivity  implements   SurfaceHolder.
             }
         }
     };
-    @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-/**
- * surface 생성
- */
-        if (mediaPlayer == null) {
-            mediaPlayer = new MediaPlayer();
-        } else {
-            mediaPlayer.reset();
-        }
-
-        try {
-// local resource : raw에 포함시켜 놓은 리소스 호출
-            Uri uri = Uri.parse("android.resource://" + getPackageName() + "/raw/too_cute");
-            mediaPlayer.setDataSource(this, uri);
-
-// external URL : 외부 URL이나 path를 지정한 리소스
-// String path = "http://techslides.com/demos/sample-videos/small.mp4";
-// mediaPlayer.setDataSource(path);
-
-            mediaPlayer.setDisplay(holder); // 화면 호출
-            mediaPlayer.prepare(); // 비디오 load 준비
-            mediaPlayer.setOnCompletionListener(completionListener); // 비디오 재생 완료 리스너
-// mediaPlayer.setOnVideoSizeChangedListener(sizeChangeListener); // 비디오 크기 변경 리스너
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    MediaPlayer.OnCompletionListener completionListener = new MediaPlayer.OnCompletionListener() {
-        /**
-         * 비디오가 전부 재생된 상태의 리스너
-         * @param mp : 현재 제어하고 있는 MediaPlayer
-         */
-        @Override
-        public void onCompletion(MediaPlayer mp) {
-            playButton.setText("Play");
-        }
-    };
-
-    MediaPlayer.OnVideoSizeChangedListener sizeChangeListener = new MediaPlayer.OnVideoSizeChangedListener() {
-        @Override
-        public void onVideoSizeChanged(MediaPlayer mp, int width, int height) {
-        }
-    };
 
     @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+    public void onClick(View view) {
+        switch (view.getId()){
+            case R.id.tts:
 
-    }
+                Random r = new Random();
+                Log.e(TAG, "한글 출력 시작!");
+                String utteranceId = this.hashCode() + "";
 
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
-
-    }
-
-    private void startOrPause() {
-        if (mediaPlayer.isPlaying()) {
-            mediaPlayer.pause();
-            playButton.setText("Play");
-        } else {
-            mediaPlayer.start();
-            playButton.setText("Pause");
+                mTTS.speak( mDurisays.get(r.nextInt(mDurisays.size())), TextToSpeech.QUEUE_ADD, null, utteranceId);
+                break;
         }
     }
-
-    private void stopNprepare() {
-        mediaPlayer.stop();
-        playButton.setText("Play");
-
-
-        try {
-// mediaplayer 재생 준비
-            mediaPlayer.prepare();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-
 
     private class WebViewClientClass extends WebViewClient {
         @Override
@@ -300,6 +249,103 @@ public class MainActivity extends AppCompatActivity  implements   SurfaceHolder.
     protected void attachBaseContext(Context newBase) {
         super.attachBaseContext(TypekitContextWrapper.wrap(newBase));
     }
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // NOTE : initialize() must be called on start time.
+        naverRecognizer.getSpeechRecognizer().initialize();
+    }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        mResult = "";
+        txtResult.setText("");
+        btnStart.setText(R.string.str_start);
+        btnStart.setEnabled(true);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // NOTE : release() must be called on stop time.
+        naverRecognizer.getSpeechRecognizer().release();
+    }
+
+    // Declare handler for handling SpeechRecognizer thread's Messages.
+    static class RecognitionHandler extends Handler {
+        private final WeakReference<MainActivity> mActivity;
+
+        RecognitionHandler(MainActivity activity) {
+            mActivity = new WeakReference<MainActivity>(activity);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            MainActivity activity = mActivity.get();
+            if (activity != null) {
+                activity.handleMessage(msg);
+            }
+        }
+    }
+
+
+    // Handle speech recognition Messages.
+    private void handleMessage(Message msg) {
+        switch (msg.what) {
+            case R.id.clientReady:
+                // Now an user can speak.
+                txtResult.setText("Connected");
+                writer = new AudioWriterPCM(
+                        Environment.getExternalStorageDirectory().getAbsolutePath() + "/NaverSpeechTest");
+                writer.open("Test");
+                break;
+
+            case R.id.audioRecording:
+                writer.write((short[]) msg.obj);
+                break;
+
+            case R.id.partialResult:
+                // Extract obj property typed with String.
+                mResult = (String) (msg.obj);
+                txtResult.setText(mResult);
+                break;
+
+            case R.id.finalResult:
+                // Extract obj property typed with String array.
+                // The first element is recognition result for speech.
+                SpeechRecognitionResult speechRecognitionResult = (SpeechRecognitionResult) msg.obj;
+                List<String> results = speechRecognitionResult.getResults();
+                StringBuilder strBuf = new StringBuilder();
+                for(String result : results) {
+                    strBuf.append(result);
+                    strBuf.append("\n");
+                }
+                mResult = strBuf.toString();
+                txtResult.setText(mResult);
+                break;
+
+            case R.id.recognitionError:
+                if (writer != null) {
+                    writer.close();
+                }
+
+                mResult = "Error code : " + msg.obj.toString();
+                txtResult.setText(mResult);
+                btnStart.setText(R.string.str_start);
+                btnStart.setEnabled(true);
+                break;
+
+            case R.id.clientInactive:
+                if (writer != null) {
+                    writer.close();
+                }
+
+                btnStart.setText(R.string.str_start);
+                btnStart.setEnabled(true);
+                break;
+        }
+    }
 
 }
