@@ -1,6 +1,8 @@
 package kr.hs.emirim.progh2.blinkled;
 
 import android.content.Context;
+import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -57,6 +59,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private String mResult;
     private AudioWriterPCM writer;
 
+    private Button btnWifi;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -88,34 +92,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         });
 
+//
+//        PeripheralManagerService service = new PeripheralManagerService();
+//        try {
+//            mLed1 = service.openGpio(LED1_PIN);
+//            mLed1.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
+//            mLed2 = service.openGpio(LED2_PIN);
+//            mLed2.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
+//            mLed3 = service.openGpio(LED3_PIN);
+//            mLed3.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
+//
+//        }catch(Exception e) {
+//            Log.e(TAG, "뭔가 에러 났어요~ : Error on PeripheralIO API", e);
+//        }
+//
+//        mState = 1;
+//        mHandler.post(mBlinkRunnable);
 
-        PeripheralManagerService service = new PeripheralManagerService();
-        try {
-            mLed1 = service.openGpio(LED1_PIN);
-            mLed1.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
-            mLed2 = service.openGpio(LED2_PIN);
-            mLed2.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
-            mLed3 = service.openGpio(LED3_PIN);
-            mLed3.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
-
-        }catch(Exception e) {
-            Log.e(TAG, "뭔가 에러 났어요~ : Error on PeripheralIO API", e);
-        }
-
-        mState = 1;
-        mHandler.post(mBlinkRunnable);
-
-        WebView w = (WebView) findViewById(R.id.webview);
-        // 웹뷰에서 자바스크립트실행가능
-        w.getSettings().setJavaScriptEnabled(true);
-
-        w.getSettings().setDefaultTextEncodingName("UTF-8");
+//        WebView w = (WebView) findViewById(R.id.webview);
+//        // 웹뷰에서 자바스크립트실행가능
+//        w.getSettings().setJavaScriptEnabled(true);
+//
+//        w.getSettings().setDefaultTextEncodingName("UTF-8");
         String str = "한글";
-        w.loadData(str,  "text/html", "UTF-8");  // Android 4.0 이하 버전
-        w.loadData(str,  "text/html; charset=UTF-8", null);  // Android 4.1 이상 버전
-
-        // 구글홈페이지 지정
-        w.loadUrl("https://and26oo-d34ec.firebaseapp.com/");
+//        w.loadData(str,  "text/html", "UTF-8");  // Android 4.0 이하 버전
+//        w.loadData(str,  "text/html; charset=UTF-8", null);  // Android 4.1 이상 버전
+//
+//        // 구글홈페이지 지정
+//        w.loadUrl("https://and26oo-d34ec.firebaseapp.com/");
 
 
         ImageView imageView = (ImageView) findViewById(R.id.imageView);
@@ -125,7 +129,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 .into(imageView);
 
         // WebViewClient 지정
-        w.setWebViewClient(new WebViewClientClass());
+        //w.setWebViewClient(new WebViewClientClass());
 
         txtResult = (TextView) findViewById(R.id.txt_result);
         btnStart = (Button) findViewById(R.id.btn_start);
@@ -146,6 +150,31 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
             }
         });
+
+        btnWifi = (Button) findViewById(R.id.wifi);
+        btnWifi.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                connectWifi();
+            }
+        });
+    }
+
+    private void connectWifi(){
+
+        WifiManager manager = (WifiManager) getSystemService(WIFI_SERVICE);
+
+        Log.e(TAG, "WIFI 상태 : " + manager.getWifiState() );
+        Log.e(TAG, "WIFI 접속 시도");
+        String networkSSID = "WIFI_SSID";   // 2.5 GHz만 연결 가능
+        String networkPasskey = "WIFI_PW";
+        Log.e(TAG, networkSSID + " / " + networkPasskey );
+        WifiConfiguration wifiConfiguration = new WifiConfiguration();
+        wifiConfiguration.SSID = "\"" + networkSSID + "\"";
+        wifiConfiguration.preSharedKey = "\"" + networkPasskey + "\"";
+
+        manager.addNetwork(wifiConfiguration);
+        Log.e(TAG, "WIFI 상태 : " + manager.getWifiState() );
     }
 
 
@@ -324,6 +353,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
                 mResult = strBuf.toString();
                 txtResult.setText(mResult);
+
+                String utteranceId = this.hashCode() + "";
+                if(results.size() > 0 ) {
+                    mTTS.speak("주인님께서 말씀하신 말은", TextToSpeech.QUEUE_ADD, null, utteranceId);
+                    mTTS.speak(results.get(0), TextToSpeech.QUEUE_ADD, null, utteranceId);
+                    mTTS.speak("라고 생각합니다.", TextToSpeech.QUEUE_ADD, null, utteranceId);
+                }
                 break;
 
             case R.id.recognitionError:

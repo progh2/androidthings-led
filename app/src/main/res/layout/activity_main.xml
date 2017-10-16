@@ -39,6 +39,12 @@
         android:id="@+id/tts"
         android:text="안녕이라고 말해보렴" />
 
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/wifi"
+        android:text="Wifi연결!"/>
+
 
     <ImageView
         android:id="@+id/imageView"
