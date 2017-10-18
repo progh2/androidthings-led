@@ -12,32 +12,48 @@
     android:orientation="vertical"
     tools:context="kr.hs.emirim.progh2.blinkled.MainActivity">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/state"
-        android:text="안녕안녕!" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:orientation="horizontal"
+        android:layout_height="wrap_content">
 
-    <Button
-        android:id="@+id/btn_start"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
-        android:text="@string/str_start" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/state"
+            android:text="안녕안녕!" />
 
-    <TextView
-        android:id="@+id/txt_result"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/btn_start"
-        android:layout_centerHorizontal="true"
-        android:singleLine="false" />
+        <TextView
+            android:id="@+id/txt_pir"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="모션센서상태"  />
+        <TextView
+            android:id="@+id/txt_temp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="온도센서상태"  />
+        <Button
+            android:id="@+id/btn_start"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/str_start" />
 
-    <Button
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/tts"
-        android:text="안녕이라고 말해보렴" />
+        <TextView
+            android:id="@+id/txt_result"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:singleLine="false" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/tts"
+            android:text="안녕이라고 말해보렴" />
+
+    </LinearLayout>
+
+
 
     <Button
         android:layout_width="wrap_content"

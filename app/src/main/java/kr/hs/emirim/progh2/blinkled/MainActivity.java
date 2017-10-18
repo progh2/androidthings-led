@@ -16,10 +16,11 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.google.android.things.pio.Gpio;
+import com.google.android.things.pio.GpioCallback;
 import com.google.android.things.pio.PeripheralManagerService;
+import com.google.android.things.pio.SpiDevice;
 import com.naver.speech.clientapi.SpeechRecognitionResult;
 import com.squareup.picasso.Picasso;
 import com.tsengvn.typekit.TypekitContextWrapper;
@@ -39,7 +40,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private static final String LED2_PIN = "BCM27";
     private static final String LED3_PIN = "BCM22";
 
-    private Handler mHandler = new Handler();
+//    private Handler mHandler = new Handler();
     private Gpio mLed1;
     private Gpio mLed2;
     private Gpio mLed3;
@@ -61,10 +62,64 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private Button btnWifi;
 
+    public static final String PIR_PIN = "BCM4"; //physical pin #11
+    private Gpio mPirGpio;
+    private TextView textPri;
+    private  TextView textTemp;
+
+//    private static final int INTERVAL_BETWEEN_SPI_MS = 2000;
+//    private static final String SPI_DEVICE_NAME = "SPI0.0";
+//    private Handler mHandler = new Handler();
+//    private SpiDevice mDevice;
+
+    private MCP3008 mMCP3008;
+    private Handler mHandler;
+    private Runnable mReadAdcRunnable = new Runnable() {
+        private static final long DELAY_MS = 3000L; // 3 seconds
+        @Override
+        public void run() {
+            int temp;
+            double temp2;
+            if (mMCP3008 == null) {
+                return;
+            }
+
+            try {
+                Log.e("MCP3008", "ADC 0: " + mMCP3008.readAdc(0x0));
+                textPri.setText("ADC 0 : " + mMCP3008.readAdc(0x0)) ;
+                Log.e("MCP3008", "ADC 1: " + mMCP3008.readAdc(0x1));
+                temp = Integer.parseInt( "" + mMCP3008.readAdc(0x1) );
+                temp2 = ( temp * 5 * 100 ) / 1024;
+                textTemp.setText("온도 : " + temp2 ) ;
+                Log.e("MCP3008", "ADC 2: " + mMCP3008.readAdc(0x2));
+                Log.e("MCP3008", "ADC 3: " + mMCP3008.readAdc(0x3));
+                Log.e("MCP3008", "ADC 4: " + mMCP3008.readAdc(0x4));
+                Log.e("MCP3008", "ADC 5: " + mMCP3008.readAdc(0x5));
+                Log.e("MCP3008", "ADC 6: " + mMCP3008.readAdc(0x6));
+                Log.e("MCP3008", "ADC 7: " + mMCP3008.readAdc(0x7));
+            } catch( IOException e ) {
+                Log.e("MCP3008", "Something went wrong while reading from the ADC: " + e.getMessage());
+            }
+
+            mHandler.postDelayed(this, DELAY_MS);
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        try {
+            // String csPin, String clockPin, String mosiPin, String misoPin
+            mMCP3008 = new MCP3008("BCM8", "BCM11", "BCM10", "BCM9");
+            mMCP3008.register();
+        } catch( IOException e ) {
+            Log.e(TAG, "MCP initialization exception occurred: " + e.getMessage());
+        }
+
+        mHandler = new Handler();
+        mHandler.post(mReadAdcRunnable);
 
         mTextView = (TextView) findViewById(R.id.state);
         mButtonTTS = (Button) findViewById(R.id.tts);
@@ -92,20 +147,30 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         });
 
-//
-//        PeripheralManagerService service = new PeripheralManagerService();
-//        try {
+        textPri = (TextView) findViewById(R.id.txt_pir);
+        textTemp = (TextView) findViewById(R.id.txt_temp);
+        PeripheralManagerService service = new PeripheralManagerService();
+        try {
 //            mLed1 = service.openGpio(LED1_PIN);
 //            mLed1.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
 //            mLed2 = service.openGpio(LED2_PIN);
 //            mLed2.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
 //            mLed3 = service.openGpio(LED3_PIN);
 //            mLed3.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
-//
-//        }catch(Exception e) {
-//            Log.e(TAG, "뭔가 에러 났어요~ : Error on PeripheralIO API", e);
-//        }
-//
+            mPirGpio = service.openGpio(PIR_PIN);
+            // Configure as an input.
+            mPirGpio.setDirection(Gpio.DIRECTION_IN);
+            // Enable edge trigger events for both falling and rising edges. This will make it a toggle button.
+            mPirGpio.setEdgeTriggerType(Gpio.EDGE_BOTH);
+            // Register an event callback.
+            mPirGpio.registerGpioCallback(mSetPRICallback);
+
+//            mDevice = service.openSpiDevice(SPI_DEVICE_NAME);
+        }catch(Exception e) {
+            Log.e(TAG, "뭔가 에러 났어요~ : Error on PeripheralIO API", e);
+        }
+//        mHandler.post(mSpiRunaable);
+
 //        mState = 1;
 //        mHandler.post(mBlinkRunnable);
 
@@ -158,6 +223,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 connectWifi();
             }
         });
+
+
     }
 
     private void connectWifi(){
@@ -181,42 +248,89 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        mHandler.removeCallbacks(mBlinkRunnable);
-        // Clean all resources;
-        if(mLed1 != null){
-            try{
-                mLed1.setValue(false);
-                mLed1.close();
-            }catch (IOException e ){
-                Log.e(TAG, "Error on PIO API", e);
-            }
-        }
-        if(mLed2 != null){
-            try{
-                mLed2.setValue(false);
-                mLed2.close();
-            }catch (IOException e ){
-                Log.e(TAG, "Error on PIO API", e);
-            }
-        }
-        if(mLed3 != null){
-            try{
-                mLed3.setValue(false);
-                mLed3.close();
-            }catch (IOException e ){
-                Log.e(TAG, "Error on PIO API", e);
+//        mHandler.removeCallbacks(mBlinkRunnable);
+//        // Clean all resources;
+//
+//        if(mLed1 != null){
+//            try{
+//                mLed1.setValue(false);
+//                mLed1.close();
+//            }catch (IOException e ){
+//                Log.e(TAG, "Error on PIO API", e);
+//            }
+//        }
+//        if(mLed2 != null){
+//            try{
+//                mLed2.setValue(false);
+//                mLed2.close();
+//            }catch (IOException e ){
+//                Log.e(TAG, "Error on PIO API", e);
+//            }
+//        }
+//        if(mLed3 != null){
+//            try{
+//                mLed3.setValue(false);
+//                mLed3.close();
+//            }catch (IOException e ){
+//                Log.e(TAG, "Error on PIO API", e);
+//            }
+//        }
+        // Close the resource
+        if (mPirGpio != null) {
+            mPirGpio.unregisterGpioCallback(mSetPRICallback);
+            try {
+                mPirGpio.close();
+            } catch (IOException e) {
+                Log.e(TAG, "Error on PeripheralIO API", e);
             }
         }
 
+//        if (mDevice != null) {
+//            try {
+//                mDevice.close();
+//                mDevice = null;
+//            } catch (IOException e) {
+//                Log.e(TAG, "SPI 장치 닫기 실패", e);
+//            }
+//        }
 
+        if( mMCP3008 != null ) {
+            mMCP3008.unregister();
+        }
+
+        if( mHandler != null ) {
+            mHandler.removeCallbacks(mReadAdcRunnable);
+        }
     }
 
-    private Runnable mBlinkRunnable = new Runnable() {
+//    private String byteToHexString(byte[] bytes) {
+//        StringBuilder sb = new StringBuilder();
+//        for(byte b : bytes){
+//            sb.append(String.format("%02x", b&0xff));
+//        }
+//        return sb.toString();
+//    }
+//
+//    private Runnable mSpiRunaable = new Runnable() {
+//        @Override
+//        public void run() {
+//            if(mDevice == null) return;
+//
+//            try{
+//                byte[] tx = new byte[2];
+//                byte[] rx = new byte[2];
+//
+//                new
+//            }
+//        }
+//    }
+
+        private Runnable mBlinkRunnable = new Runnable() {
         @Override
         public void run() {
 
 
-            Toast.makeText(getApplicationContext(), "효원아 안녕", Toast.LENGTH_LONG).show();
+            //Toast.makeText(getApplicationContext(), "효원아 안녕", Toast.LENGTH_LONG).show();
 
             if(mLed1 == null || mLed2 == null || mLed3 == null) {
                 return;
@@ -383,5 +497,25 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 break;
         }
     }
+    // Register an event callback.
+    private GpioCallback mSetPRICallback = new GpioCallback() {
+        @Override
+        public boolean onGpioEdge(Gpio gpio) {
+            Log.i(TAG, "GPIO callback ------------");
 
+            try {
+                Log.i(TAG, "GPIO callback -->" + gpio.getValue());
+                // set the LED state to opposite of input state
+                if(gpio.getValue()){
+                    textPri.setText("감지됨");
+                }else{
+                    textPri.setText("감지안됨");
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "Error on PeripheralIO API", e);
+            }
+            // Return true to keep callback active.
+            return true;
+        }
+    };
 }
